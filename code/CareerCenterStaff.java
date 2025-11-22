@@ -1,0 +1,203 @@
+import java.util.*;
+
+public class CareerCenterStaff extends User{
+    private String staffDepartment;
+    private String email;
+    private String careerCenterStaffID;
+    
+    public CareerCenterStaff(String userID, String careerCenterStaffID, String name, String staffDepartment, String email){
+        super(userID, name, "password");
+        this.careerCenterStaffID = careerCenterStaffID;
+        this.staffDepartment = staffDepartment;
+        this.email = email;
+    }
+    
+    public String getStaffDepartment(){
+        return this.staffDepartment;
+    }
+    public void setStaffDepartment(String staffDepartment){
+        this.staffDepartment = staffDepartment;
+    }
+    public String getEmail() { return this.email; }
+    public void setEmail(String email) {
+        this.email = email;
+    }
+
+    public boolean authoriseCompanyRep(CompanyRepresentative companyRep, boolean approve,
+                                       CompanyRepresentative[] pendingReps) {
+        if (companyRep == null || pendingReps == null) {
+            return false;
+        }
+
+        if (approve) {
+            companyRep.setStatus("Approved");
+            System.out.println("Company Representative " + companyRep.getName() + " approved.");
+        } else {
+            companyRep.setStatus("Rejected");
+            System.out.println("Company Representative " + companyRep.getName() + " rejected.");
+        }
+        return true;
+    }
+    
+    public boolean approveRejectInternship(Internship internship, boolean approve,
+                                           Internship[] pendingInternships) {
+        if (internship == null || pendingInternships == null) {
+            return false;
+        }
+
+        if (approve) {
+            internship.setStatus("Approved");
+            internship.setVisible(true);
+            System.out.println("Internship '" + internship.getTitle() + "' approved.");
+        } else {
+            internship.setStatus("Rejected");
+            System.out.println("Internship '" + internship.getTitle() + "' rejected.");
+        }
+        return true;
+    }
+    
+    public boolean approveRejectWithdrawal(WithdrawalRequest withdrawalRequest, boolean approve,
+                                           List<Internship> allInternships,
+                                           WithdrawalRequest[] pendingWithdrawals) {
+        if (withdrawalRequest == null || pendingWithdrawals == null) {
+            return false;
+        }
+
+        if (approve) {
+            withdrawalRequest.getApplication().updateStatus("Withdrawn");
+            withdrawalRequest.getApplication().getStudent().removeInternship();
+            Internship internship = findInternshipByApplication(withdrawalRequest.getApplication(), allInternships);
+            if (internship != null) {
+                internship.removeApplication(withdrawalRequest.getApplication());
+            }
+            System.out.println("Withdrawal request approved.");
+        }
+        return true;
+    }
+
+    private Internship findInternshipByApplication(Application application, List<Internship> allInternships) {
+        for (Internship internship : allInternships) {
+            if (internship.containsApplication(application)) {
+                return internship;
+            }
+        }
+        return null;
+    }
+
+    public Report generateReportWithFilters(Map<String, Object> filters, String reportType, List<Internship> allInternships) {
+        String reportData = generateReportDataFromFilters(filters, allInternships);
+
+        Report report = new Report();
+        report.setReportData(reportData);
+        report.setGeneratedBy(this);
+        report.setReportType(reportType);
+        report.setFilters(filters);
+
+        System.out.println("Report generated: " + report.getReportID());
+        System.out.println("Filters applied: " + filters.size());
+
+        return report;
+    }
+
+
+    public Report generateQuickReport(List<Internship> allInternships) {
+        Map<String, Object> emptyFilters = new HashMap<>();
+        return generateReportWithFilters(emptyFilters, "Quick Summary", allInternships);
+    }
+
+
+    public Report generateInternshipStatusReport(String status, List<Internship> allInternships) {
+        Map<String, Object> filters = new HashMap<>();
+        filters.put("status", status);
+        filters.put("report_format", "Detailed");
+
+        return generateReportWithFilters(filters, "Internship Status Report", allInternships);
+    }
+    
+    private String generateReportDataFromFilters(Map<String, Object> filters, List<Internship> allInternships) {
+        StringBuilder data = new StringBuilder();
+
+        data.append("INTERNSHIP PLACEMENT MANAGEMENT SYSTEM REPORT\n");
+        data.append("=============================================\n");
+        data.append("Generated on: ").append(new Date()).append("\n");
+        data.append("Generated by: ").append(getName()).append("\n");
+        data.append("Department: ").append(getStaffDepartment()).append("\n\n");
+        
+        if (!filters.isEmpty()) {
+            data.append("ACTIVE FILTERS:\n");
+            data.append("---------------\n");
+            for (Map.Entry<String, Object> entry : filters.entrySet()) {
+                data.append("• ").append(entry.getKey()).append(": ").append(entry.getValue()).append("\n");
+            }
+            data.append("\n");
+        }
+        
+        data.append("REPORT DATA:\n");
+        data.append("------------\n");
+        List<Internship> filteredInternships = new ArrayList<>(allInternships);
+        if (filters.containsKey("status") && !"All".equals(filters.get("status"))) {
+            String statusFilter = (String) filters.get("status");
+            filteredInternships.removeIf(internship -> !statusFilter.equals(internship.getStatus()));
+        }
+
+        if (filters.containsKey("preferred_major") && !"All".equals(filters.get("preferred_major"))) {
+            String majorFilter = (String) filters.get("preferred_major");
+            filteredInternships.removeIf(internship -> !majorFilter.equals(internship.getPreferredMajor()));
+        }
+
+        if (filters.containsKey("internship_level") && !"All".equals(filters.get("internship_level"))) {
+            String levelFilter = (String) filters.get("internship_level");
+            filteredInternships.removeIf(internship -> !levelFilter.equals(internship.getLevel()));
+        }
+
+        if (filters.containsKey("company_name") && !"All".equals(filters.get("internship_level"))) {
+            String companyFilter = (String) filters.get("company_name");
+            filteredInternships.removeIf(internship -> !internship.getCompanyName().toLowerCase().contains(companyFilter.toLowerCase()));
+
+        }
+        if (!filters.isEmpty()) {
+            data.append("ALL FILTERED INTERNSHIPS:\n");
+            data.append("• Total Matching: ").append(filteredInternships.size()).append("\n");
+            for (Internship internship : filteredInternships) {
+                data.append("  - ").append(internship.getTitle())
+                        .append(" | ").append(internship.getCompanyName())
+                        .append(" | ").append(internship.getLevel())
+                        .append(" | ").append(internship.getPreferredMajor())
+                        .append(" | ").append(internship.getStatus()).append("\n");
+            }
+            data.append("\n");
+        }
+
+        if (filters.isEmpty()) {
+            data.append("SYSTEM OVERVIEW:\n");
+            data.append("• Total Internship Opportunities: ").append(allInternships.size()).append("\n");
+            data.append("• Pending Approvals: ").append(
+                    allInternships.stream()
+                            .filter(internship -> "Pending".equals(internship.getStatus()))
+                            .count()).append("\n");
+            data.append("• Approved Internships: ").append(
+                    allInternships.stream()
+                            .filter(internship -> "Approved".equals(internship.getStatus()))
+                            .count()).append("\n");
+            data.append("• Filled Internships: ").append(
+                    allInternships.stream()
+                            .filter(internship -> "Filled".equals(internship.getStatus()))
+                            .count()).append("\n");
+            data.append("• Rejected Internships: ").append(
+                    allInternships.stream()
+                            .filter(internship -> "Rejected".equals(internship.getStatus()))
+                            .count()).append("\n\n");
+            data.append("ALL INTERNSHIPS:\n");
+            data.append("• Total: ").append(allInternships.size()).append("\n");
+            for (Internship internship : allInternships) {
+                data.append("  - ").append(internship.getTitle())
+                        .append(" | ").append(internship.getCompanyName())
+                        .append(" | ").append(internship.getLevel())
+                        .append(" | ").append(internship.getPreferredMajor())
+                        .append(" | ").append(internship.getStatus()).append("\n");
+            }
+        }
+
+        return data.toString();
+    }
+}
